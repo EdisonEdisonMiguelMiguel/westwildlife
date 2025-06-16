@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wildlife Sightings Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+            max-width: 200px;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">Loading sightings...</div>
+    
+    <div class="info-panel">
+        <h3>🦅 Wildlife Sightings</h3>
+        <p><strong>Total Sightings:</strong> <span id="sighting-count">0</span></p>
+        <p><em>Click markers for details</em></p>
+    </div>
+    
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ⚠️ REPLACE THESE WITH YOUR ACTUAL SUPABASE DETAILS
+        const SUPABASE_URL = 'https://zfnycwzhkcajfdpdqufu.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpmbnljd3poa2NhamZkcGRxdWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4ODcxNzQsImV4cCI6MjA2NTQ2MzE3NH0.Bw85CmmosaC5diHxRXJX0QvdYA1O_5HKj1RevPdz6A8';
+
+        // Initialize the map (centered on a default location)
+        const map = L.map('map').setView([40.7128, -74.0060], 8);
+
+        // Add OpenStreetMap tiles (free!)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Function to create custom icons for different species
+        function getSpeciesIcon(speciesName) {
+            const colors = {
+                'Mountain Lion': '🦁',
+                'Golden Eagle': '🦅', 
+                'Black Bear': '🐻',
+                'Peregrine Falcon': '🦅',
+                'Bighorn Sheep': '🐏',
+                'Gray Wolf': '🐺'
+            };
+            
+            return colors[speciesName] || '📍';
+        }
+
+        // Function to load sightings from Supabase
+        async function loadSightings() {
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/sightings?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const sightings = await response.json();
+                console.log('Loaded sightings:', sightings);
+
+                // Clear loading message
+                document.getElementById('loading').style.display = 'none';
+
+                // Update sighting count
+                document.getElementById('sighting-count').textContent = sightings.length;
+
+                // Add markers to map
+                sightings.forEach(sighting => {
+                    // You'll need to adjust these field names to match your database
+                    const lat = sighting.latitude || sighting.lat;
+                    const lng = sighting.longitude || sighting.lng;
+                    
+                    if (lat && lng) {
+                        const marker = L.marker([lat, lng]).addTo(map);
+                        
+                        // Create popup content
+                        const popupContent = `
+                            <div style="min-width: 200px;">
+                                <h4>${getSpeciesIcon(sighting.species_name)} ${sighting.species_name || 'Unknown Species'}</h4>
+                                <p><strong>Date:</strong> ${sighting.sighting_date || 'Unknown'}</p>
+                                <p><strong>Time:</strong> ${sighting.sighting_time || 'Unknown'}</p>
+                                <p><strong>Count:</strong> ${sighting.individual_count || 1}</p>
+                                <p><strong>Behavior:</strong> ${sighting.behavior_observed || 'Not recorded'}</p>
+                                <p><strong>Weather:</strong> ${sighting.weather_conditions || 'Not recorded'}</p>
+                                ${sighting.notes ? `<p><strong>Notes:</strong> ${sighting.notes}</p>` : ''}
+                                <small style="color: #666;">Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}</small>
+                            </div>
+                        `;
+                        
+                        marker.bindPopup(popupContent);
+                    }
+                });
+
+                // Fit map to show all markers
+                if (sightings.length > 0) {
+                    const group = new L.featureGroup(map._layers);
+                    if (Object.keys(group._layers).length > 0) {
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error loading sightings:', error);
+                document.getElementById('loading').innerHTML = 
+                    '❌ Error loading data. Check console for details.';
+            }
+        }
+
+        // Load sightings when page loads
+        loadSightings();
+
+        // Auto-refresh every 60 seconds
+        setInterval(loadSightings, 60000);
+    </script>
+</body>
+</html>
