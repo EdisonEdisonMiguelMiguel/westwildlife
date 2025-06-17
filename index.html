@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wildlife Sightings Map</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
         .info-panel {
             position: absolute;
@@ -14,21 +14,10 @@
             right: 10px;
             background: white;
             padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             z-index: 1000;
-            max-width: 280px;
-            font-size: 14px;
-        }
-        .info-panel h3 {
-            margin: 0 0 12px 0;
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 5px;
-        }
-        .info-panel p {
-            margin: 8px 0;
-            color: #34495e;
+            max-width: 200px;
         }
         .loading {
             position: absolute;
@@ -37,285 +26,127 @@
             transform: translate(-50%, -50%);
             z-index: 2000;
             background: white;
-            padding: 25px 35px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-            text-align: center;
-        }
-        .loading-spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .species-legend {
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #eee;
-            font-size: 12px;
-        }
-        .species-item {
-            margin: 3px 0;
-            display: flex;
-            align-items: center;
-        }
-        .species-icon {
-            margin-right: 8px;
-            font-size: 16px;
-        }
-        .error-message {
-            color: #e74c3c;
-            background: #fdf2f2;
-            padding: 15px;
+            padding: 20px;
             border-radius: 5px;
-            border-left: 4px solid #e74c3c;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
     </style>
 </head>
 <body>
-    <div id="loading" class="loading">
-        <div class="loading-spinner"></div>
-        <div>Loading wildlife sightings...</div>
-    </div>
-    
+    <div id="loading" class="loading">Loading sightings...</div>
     <div class="info-panel">
         <h3>🦅 Wildlife Sightings</h3>
         <p><strong>Total Sightings:</strong> <span id="sighting-count">0</span></p>
-        <p><strong>Mapped:</strong> <span id="mapped-count">0</span></p>
         <p><em>Click markers for details</em></p>
-        
-        <div class="species-legend">
-            <strong>Species Legend:</strong>
-            <div class="species-item"><span class="species-icon">🦁</span> Mountain Lion</div>
-            <div class="species-item"><span class="species-icon">🦅</span> Golden Eagle</div>
-            <div class="species-item"><span class="species-icon">🐻</span> Black Bear</div>
-            <div class="species-item"><span class="species-icon">🦅</span> Peregrine Falcon</div>
-            <div class="species-item"><span class="species-icon">🐏</span> Bighorn Sheep</div>
-            <div class="species-item"><span class="species-icon">🐺</span> Gray Wolf</div>
-        </div>
     </div>
-    
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-    <script>
-        // Initialize the map centered on Colorado
-        const map = L.map('map').setView([39.0, -106.5], 7);
+        // ⚠️ REPLACE WITH YOUR SUPABASE DETAILS
+        const SUPABASE_URL = 'https://zfnycwzhkcajfdpdqufu.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpmbnljd3poa2NhamZkcGRxdWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4ODcxNzQsImV4cCI6MjA2NTQ2MzE3NH0.Bw85CmmosaC5diHxRXJX0QvdYA1O_5HKj1RevPdz6A8';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Add OpenStreetMap tiles
+        // Initialize Leaflet map
+        const map = L.map('map').setView([39.5, -107.5], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Species mapping based on your data
-        const speciesData = {
-            1: { name: 'Mountain Lion', icon: '🦁', color: 'red' },
-            2: { name: 'Golden Eagle', icon: '🦅', color: 'blue' },
-            3: { name: 'Black Bear', icon: '🐻', color: 'darkgreen' },
-            4: { name: 'Peregrine Falcon', icon: '🦅', color: 'purple' },
-            5: { name: 'Bighorn Sheep', icon: '🐏', color: 'orange' },
-            6: { name: 'Gray Wolf', icon: '🐺', color: 'gray' }
+        // Species mapping
+        const speciesMap = {
+            1: 'Mountain Lion',
+            2: 'Golden Eagle',
+            3: 'Black Bear',
+            4: 'Peregrine Falcon',
+            5: 'Bighorn Sheep',
+            6: 'Gray Wolf'
         };
 
-        // Your Supabase credentials
-        const SUPABASE_URL = 'https://zfnycwzhkcajfdpdqufu.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpmbnljd3poa2NhamZkcGRxdWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4ODcxNzQsImV4cCI6MjA2NTQ2MzE3NH0.Bw85CmmosaC5diHxRXJX0QvdYA1O_5HKj1RevPdz6A8';
-
-        // Store markers
-        let allMarkers = [];
-
-        // Function to decode WKB coordinates
-        function decodeWKBCoordinates(wkbHex) {
-            if (!wkbHex || wkbHex.trim() === '') {
-                console.log('Empty WKB data');
-                return null;
-            }
-            
-            try {
-                console.log('Decoding WKB:', wkbHex.substring(0, 50) + '...');
-                
-                // Your WKB format: 0101000020E6100000 + 32 hex chars for coordinates
-                // Remove SRID prefix and get coordinates (last 32 characters)
-                const coordsHex = wkbHex.slice(-32);
-                
-                // Split into longitude (X) and latitude (Y) - 16 chars each
-                const lonHex = coordsHex.substring(0, 16);
-                const latHex = coordsHex.substring(16, 32);
-                
-                // Convert little-endian hex to double
-                function hexToDouble(hex) {
-                    // Reverse bytes for little-endian
-                    const bytes = [];
-                    for (let i = hex.length - 2; i >= 0; i -= 2) {
-                        bytes.push(parseInt(hex.substr(i, 2), 16));
-                    }
-                    
-                    // Create ArrayBuffer and convert to double
-                    const buffer = new ArrayBuffer(8);
-                    const view = new DataView(buffer);
-                    bytes.forEach((byte, index) => view.setUint8(index, byte));
-                    
-                    return view.getFloat64(0, true); // true = little-endian
-                }
-                
-                const longitude = hexToDouble(lonHex);
-                const latitude = hexToDouble(latHex);
-                
-                console.log(`Decoded coordinates: ${latitude}, ${longitude}`);
-                
-                // Validate coordinates (reasonable bounds for North America)
-                if (latitude >= 25 && latitude <= 75 && longitude >= -180 && longitude <= -50) {
-                    return [latitude, longitude];
-                } else {
-                    console.error(`Invalid coordinates: ${latitude}, ${longitude}`);
-                    return null;
-                }
-                
-            } catch (error) {
-                console.error('Error decoding WKB:', error);
-                return null;
-            }
-        }
-
-        // Function to clear all markers
-        function clearMarkers() {
-            allMarkers.forEach(marker => map.removeLayer(marker));
-            allMarkers = [];
-        }
-
-        // Function to format date for display
-        function formatDate(dateStr) {
-            if (!dateStr) return 'Unknown';
-            try {
-                const date = new Date(dateStr);
-                return date.toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric' 
-                });
-            } catch {
-                return dateStr;
-            }
-        }
-
-        // Function to format time for display
-        function formatTime(timeStr) {
-            if (!timeStr) return 'Unknown';
-            try {
-                // Handle both full datetime and time-only formats
-                if (timeStr.includes('T') || timeStr.length > 8) {
-                    const date = new Date(timeStr);
-                    return date.toLocaleTimeString('en-US', { 
-                        hour: '2-digit', 
-                        minute: '2-digit'
-                    });
-                } else {
-                    // Assume it's already in HH:MM:SS format
-                    return timeStr.substring(0, 5); // Take just HH:MM
-                }
-            } catch {
-                return timeStr;
-            }
-        }
-
-        // Function to add marker to map
-        function addMarkerToMap(sighting) {
-            const coords = decodeWKBCoordinates(sighting.location_point);
-            
-            if (!coords) {
-                console.log(`Skipping sighting ${sighting.sighting_id} - no valid coordinates`);
-                return false;
-            }
-            
-            const [lat, lng] = coords;
-            const species = speciesData[sighting.species_id] || { 
-                name: 'Unknown Species', 
-                icon: '❓', 
-                color: 'black' 
+        function getSpeciesIcon(id) {
+            const icons = {
+                'Mountain Lion': '🦁', 'Golden Eagle': '🦅',
+                'Black Bear': '🐻', 'Peregrine Falcon': '🦅',
+                'Bighorn Sheep': '🐏', 'Gray Wolf': '🐺'
             };
-            
-            // Create custom icon
-            const customIcon = L.divIcon({
-                html: `<div style="
-                    background: ${species.color}; 
-                    color: white; 
-                    border-radius: 50%; 
-                    width: 30px; 
-                    height: 30px; 
-                    display: flex; 
-                    align-items: center; 
-                    justify-content: center; 
-                    font-size: 16px;
-                    border: 2px solid white;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                ">${species.icon}</div>`,
-                className: 'custom-wildlife-marker',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            });
-            
-            // Create marker
-            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
-            
-            // Create detailed popup content
-            const popupContent = `
-                <div style="min-width: 250px; font-family: Arial, sans-serif;">
-                    <div style="text-align: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid ${species.color};">
-                        <h3 style="margin: 0; color: ${species.color};">
-                            ${species.icon} ${species.name}
-                        </h3>
-                    </div>
-                    
-                    <div style="margin-bottom: 12px;">
-                        <strong>📅 Date:</strong> ${formatDate(sighting.sighting_date)}<br>
-                        <strong>🕐 Time:</strong> ${formatTime(sighting.sighting_time)}<br>
-                        <strong>📊 Count:</strong> ${sighting.individual_count || 1} individual(s)
-                    </div>
-                    
-                    ${sighting.age_class ? `<p><strong>👥 Age:</strong> ${sighting.age_class}</p>` : ''}
-                    ${sighting.behavior_observed ? `<p><strong>🎯 Behavior:</strong> ${sighting.behavior_observed}</p>` : ''}
-                    
-                    <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 10px 0;">
-                        ${sighting.weather_conditions ? `<strong>🌤️ Weather:</strong> ${sighting.weather_conditions}<br>` : ''}
-                        ${sighting.temperature_celsius ? `<strong>🌡️ Temperature:</strong> ${sighting.temperature_celsius}°C<br>` : ''}
-                        ${sighting.visibility_km ? `<strong>👁️ Visibility:</strong> ${sighting.visibility_km} km<br>` : ''}
-                    </div>
-                    
-                    ${sighting.photo_taken ? '<p style="color: #27ae60;"><strong>📸 Photo taken</strong></p>' : ''}
-                    ${sighting.notes ? `<p><strong>📝 Notes:</strong> <em>${sighting.notes}</em></p>` : ''}
-                    
-                    <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #eee; font-size: 12px; color: #666;">
-                        <strong>Confidence:</strong> ${sighting.confidence_level || 'N/A'}/5<br>
-                        <strong>Location:</strong> ${lat.toFixed(4)}, ${lng.toFixed(4)}<br>
-                        <strong>Sighting ID:</strong> ${sighting.sighting_id}
-                        ${sighting.verified_by ? `<br><strong>✅ Verified</strong>` : ''}
-                    </div>
-                </div>
-            `;
-            
-            marker.bindPopup(popupContent, { maxWidth: 350 });
-            
-            // Add tooltip for quick preview
-            marker.bindTooltip(`${species.icon} ${species.name} - ${formatDate(sighting.sighting_date)}`, {
-                permanent: false,
-                direction: 'top'
-            });
-            
-            allMarkers.push(marker);
-            return true;
+            return icons[speciesMap[id]] || '📍';
         }
 
-        // Function to load all sightings
-        async function loadAllSightings() {
-            try {
-                console.log('Loading sightings from Supabase...');
-                
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/sighting
+        let markers = [];
+        function clearMarkers() {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+        }
+
+        // WKB decoder
+        function decodeWKB(hex) {
+            if (!hex) return null;
+            const coordsHex = hex.slice(-32);
+            const xHex = coordsHex.slice(0, 16);
+            const yHex = coordsHex.slice(16);
+            function hexToDouble(h) {
+                let rev = '';
+                for (let i = h.length - 2; i >= 0; i -= 2) rev += h.substr(i, 2);
+                const buf = new ArrayBuffer(8);
+                const dv = new DataView(buf);
+                for (let i = 0; i < 8; i++) dv.setUint8(i, parseInt(rev.substr(i*2, 2), 16));
+                return dv.getFloat64(0, false);
+            }
+            return { lat: hexToDouble(yHex), lng: hexToDouble(xHex) };
+        }
+
+        function addMarker(s) {
+            const coords = decodeWKB(s.location_point);
+            if (!coords) return;
+            const name = speciesMap[s.species_id] || 'Unknown';
+            const marker = L.marker([coords.lat, coords.lng]).addTo(map);
+            marker.bindPopup(\`
+                <h4>\${getSpeciesIcon(s.species_id)} \${name}</h4>
+                <p><strong>Date:</strong> \${s.sighting_date}</p>
+                <p><strong>Count:</strong> \${s.individual_count}</p>
+                <p><strong>Behavior:</strong> \${s.behavior_observed || '—'}</p>
+                <p><strong>Weather:</strong> \${s.weather_conditions || '—'}</p>
+                \${s.temperature_celsius ? `<p><strong>Temp:</strong> \${s.temperature_celsius}°C</p>` : ''}
+                <small>ID: \${s.sighting_id}</small>
+            \`);
+            markers.push(marker);
+        }
+
+        async function loadSightings() {
+            document.getElementById('loading').style.display = 'block';
+            clearMarkers();
+            const { data, error } = await supabase
+                .from('sightings')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (error) {
+                console.error(error);
+                return;
+            }
+            data.forEach(addMarker);
+            document.getElementById('sighting-count').textContent = data.length;
+            document.getElementById('loading').style.display = 'none';
+            if (markers.length) {
+                const bounds = markers.map(m => m.getLatLng());
+                map.fitBounds(bounds, { padding: [20,20] });
+            }
+        }
+
+        // Real-time updates
+        supabase
+            .from('sightings')
+            .on('INSERT', payload => {
+                addMarker(payload.new);
+                const countEl = document.getElementById('sighting-count');
+                countEl.textContent = parseInt(countEl.textContent) + 1;
+            })
+            .subscribe();
+
+        // Initial load
+        loadSightings();
+    </script>
+</body>
+</html>
